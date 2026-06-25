@@ -26,15 +26,15 @@ Route handlers must NOT import `lib/db.ts` directly. Services must NOT import fr
 
 ## Server Components vs Client Components
 
-| Aspect        | Server Component                   | Client Component                 |
-| ------------- | ---------------------------------- | -------------------------------- |
-| Directive     | None (default)                     | `"use client"` at top            |
-| Data fetching | Direct service calls               | Receives data as props           |
-| Mutations     | Not allowed                        | `fetch` to `/api/v1/*` endpoints |
-| Usage         | Page shells, layouts, data loaders | Forms, tables, interactive UI    |
-| State         | No useState/useEffect              | Full React hooks                 |
+| Aspect        | Server Component                   | Client Component                                |
+| ------------- | ------------------------------------ | ------------------------------------------------ |
+| Directive     | None (default)                      | `"use client"` at top                            |
+| Data fetching | Direct service calls                | `lib/queries/<resource>.ts` hooks (React Query)  |
+| Mutations     | Not allowed                         | `useMutation` hooks from `lib/queries/**`        |
+| Usage         | Page shells, layouts, data loaders  | Forms, tables, interactive UI                    |
+| State         | No useState/useEffect               | Full React hooks                                 |
 
-**Pattern:** Server component fetches data → passes to client component as props.
+**Pattern:** Server component fetches data via the service layer → passes it as `initialData` into a client component's React Query hook. The hook owns refetch/cache/mutation from there.
 
 ```tsx
 // Server component (page.tsx)
@@ -42,31 +42,77 @@ export default async function CommentsPage({ params }: { params: Promise<{ siteI
   const { siteId } = await params
   const session = await auth()
   const comments = await getCommentsBySite(siteId, { page: 1, limit: 50 })
-  return <CommentsTable comments={comments.items} />
+  return <CommentsTable siteId={siteId} initialComments={comments.items} />
 }
 
 // Client component (comments-table.tsx)
 "use client"
-export function CommentsTable({ comments }: { comments: Comment[] }) {
-  // interactive UI, mutations, optimistic updates
+export function CommentsTable({ siteId, initialComments }: Props) {
+  const { data: comments } = useComments(siteId, initialComments)
+  const updateStatus = useUpdateCommentStatus(siteId)
+  // interactive UI, mutations via React Query
 }
 ```
 
+## Client Data Fetching (React Query)
+
+All client-side reads and writes go through `@tanstack/react-query`, never raw `fetch()` in a component.
+
+```
+lib/api-client.ts    →  apiFetch<T>(path, init) — typed wrapper, throws ApiClientError({ message, status, details })
+lib/queries/**       →  one file per resource (sites.ts, comments.ts, users.ts, team.ts, pages.ts)
+                         exports a query-key factory + useXQuery / useXMutation hooks
+```
+
+- Components call hooks from `lib/queries/<resource>.ts`. They never call `apiFetch` or `fetch` directly.
+- `QueryClientProvider` is mounted once in `app/dashboard/layout.tsx` (dashboard-only — public/widget pages don't need it).
+- Errors surface via a **global default**: the `QueryClient`'s `queryCache`/`mutationCache` `onError` shows a sonner toast automatically. Pass `meta: { silent: true }` on a query/mutation only when the call site needs custom error UX instead.
+- Initial render uses `initialData` from the server-fetched props (no `dehydrate`/`HydrationBoundary` — one query per page, not nested trees).
+
+```ts
+// lib/queries/sites.ts
+export const siteKeys = { detail: (id: string) => ["sites", id] as const }
+
+export function useSite(id: string, initialData?: Site) {
+  return useQuery({
+    queryKey: siteKeys.detail(id),
+    queryFn: () => apiFetch<Site>(`/api/v1/sites/${id}`),
+    initialData,
+  })
+}
+
+export function useUpdateSite(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Partial<Site>) =>
+      apiFetch<Site>(`/api/v1/sites/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onMutate: async (body) => {
+      const previous = qc.getQueryData<Site>(siteKeys.detail(id))
+      qc.setQueryData(siteKeys.detail(id), (old: Site) => ({ ...old, ...body }))
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(siteKeys.detail(id), ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: siteKeys.detail(id) }),
+  })
+}
+```
+
+List-shaped optimistic updates (comments table, users table) follow the same `onMutate`/`onError` snapshot-and-rollback shape over the list's query key.
+
 ## Forms
 
-No react-hook-form. No form library. Native HTML forms + `fetch`:
+No react-hook-form. No form library. Native HTML forms + a `lib/queries/**` mutation hook:
 
 ```tsx
 "use client"
-export function GeneralSection({ site, onSiteChange }: Props) {
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+export function GeneralSection({ site }: Props) {
+  const updateSite = useUpdateSite(site.id)
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
-    const res = await fetch(`/api/v1/sites/${site.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ name: form.get('name') })
-    })
-    if (res.ok) onSiteChange(await res.json())
+    updateSite.mutate({ name: form.get('name') as string })
   }
   return <form onSubmit={handleSubmit}>...</form>
 }
@@ -74,25 +120,7 @@ export function GeneralSection({ site, onSiteChange }: Props) {
 
 ## Optimistic Updates
 
-Custom hook `hooks/use-optimistic-state.ts` — do not use React's built-in `useOptimistic`:
-
-```tsx
-const { data, updateItem, revertItem, setBusy, isBusy } = useOptimisticState(comments)
-
-const handleApprove = async (comment: Comment) => {
-  const original = { ...comment }
-  updateItem(c => c.id === comment.id, { status: 'APPROVED' })
-  try {
-    await moderateComment(comment.id, 'APPROVED')
-    toast.success('Comment approved')
-  } catch {
-    revertItem(c => c.id === comment.id, original)
-    toast.error('Failed to approve')
-  } finally {
-    setBusy(comment.id, false)
-  }
-}
-```
+Use `useMutation`'s `onMutate`/`onError`/`onSettled` against the React Query cache — do not use `hooks/use-optimistic-state.ts` (removed) or React's built-in `useOptimistic`. See "Client Data Fetching (React Query)" above for the full pattern.
 
 ## URL-as-State
 
@@ -114,7 +142,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
 | ----------------- | -------------------------------------------------------- |
 | Route handlers    | `try { ... } catch (err) { return handleApiError(err) }` |
 | Services          | `throw new ApiError("message", statusCode)`              |
-| Client components | `toast.error("message")` via sonner                      |
+| Client fetcher     | `lib/api-client.ts` throws `ApiClientError(message, status, details)` |
+| Client queries/mutations | `QueryClient`'s default `onError` → `toast.error()` via sonner. Override per-call only when UX needs to differ |
 | Error boundaries  | `error.tsx` files at route levels                        |
 
 **ApiError codes used:** 400 (bad input), 401 (unauthorized), 403 (forbidden), 404 (not found), 409 (conflict), 429 (rate limit).

@@ -35,14 +35,20 @@ open-remark/
 │   ├── auth.ts                    # Full auth config (with Prisma)
 │   ├── auth.config.ts             # Edge-safe auth (no Prisma)
 │   ├── auth-widget.ts             # Widget JWT issue/verify
-│   ├── services/                  # Business logic
+│   ├── services/                  # Business logic (server-side, no Next.js imports)
 │   │   ├── comment-service.ts
-│   │   ├── comment-client.ts
 │   │   ├── membership-service.ts  # requireSiteAccess() — all site-scoped auth checks
 │   │   ├── moderation-service.ts
 │   │   ├── page-service.ts
 │   │   ├── site-service.ts
 │   │   └── user-service.ts
+│   ├── api-client.ts              # apiFetch<T>() — typed client fetch wrapper, throws ApiClientError
+│   ├── queries/                   # Client-side React Query hooks, one file per resource
+│   │   ├── sites.ts
+│   │   ├── comments.ts
+│   │   ├── users.ts
+│   │   ├── team.ts
+│   │   └── pages.ts
 │   ├── validators/                # Zod schemas
 │   ├── api/                       # response.ts + error.ts
 │   ├── permissions/               # RBAC: site.ts, platform.ts, index.ts
@@ -52,7 +58,6 @@ open-remark/
 │   ├── sanitize.ts
 │   └── utils.ts
 ├── hooks/
-│   ├── use-optimistic-state.ts    # Optimistic UI (not React's built-in useOptimistic)
 │   └── use-mobile.ts
 ├── generated/prisma/              # Prisma client output (do not edit)
 ├── prisma/                        # Schema + migrations

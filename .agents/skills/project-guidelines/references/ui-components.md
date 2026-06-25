@@ -95,4 +95,4 @@
 | Error          | `error.tsx` with AlertTriangle icon + "Try again" + nav button                        |
 | Empty          | Dashed border box with icon, heading, description, CTA                                |
 | Inline loading | `toast.success()`/`toast.error()`, button `disabled` + text change, `Loader2` spinner |
-| Optimistic     | `useOptimisticState` → `updateItem` before fetch, `revertItem` on failure             |
+| Optimistic     | `useMutation`'s `onMutate` updates the React Query cache, `onError` rolls it back     |
