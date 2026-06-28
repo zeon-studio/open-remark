@@ -91,6 +91,7 @@ export default async function UsersPage({ params, searchParams }: Props) {
       <div className="flex-1 overflow-auto p-6">
         <UsersTable
           commenters={commenters}
+          listKey={`${siteId}:page=${currentPage}:search=${search ?? ""}`}
           siteId={siteId}
           emailNotificationsEnabled={site.emailNotificationsEnabled}
         />

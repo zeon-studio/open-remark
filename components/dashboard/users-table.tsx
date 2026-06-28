@@ -3,12 +3,12 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import {
-  banCommenter,
-  unbanCommenter,
-  deleteAllCommentsByCommenter,
-  toggleCommenterNotifications,
-} from "@/lib/services/comment-client"
-import { useOptimisticState } from "@/hooks/use-optimistic-state"
+  useCommenterList,
+  useBanCommenter,
+  useUnbanCommenter,
+  useDeleteAllCommentsByCommenter,
+  useToggleCommenterNotifications,
+} from "@/lib/queries/users"
 import {
   Table,
   TableBody,
@@ -43,6 +43,7 @@ import type {
 
 type Props = {
   commenters: CommenterWithStats[]
+  listKey: string
   siteId: string
   emailNotificationsEnabled: boolean
 }
@@ -51,6 +52,7 @@ type ConfirmAction = "deleteAll" | "ban" | null
 
 export function UsersTable({
   commenters,
+  listKey,
   siteId,
   emailNotificationsEnabled,
 }: Props) {
@@ -60,13 +62,28 @@ export function UsersTable({
     null
   )
 
-  const {
-    data: optimisticCommenters,
-    updateItem,
-    revertItem,
-    setBusy,
-    isBusy,
-  } = useOptimisticState<CommenterWithStats>(commenters)
+  const { data: liveCommenters } = useCommenterList<CommenterWithStats>(
+    listKey,
+    commenters
+  )
+
+  const banCommenter = useBanCommenter<CommenterWithStats>(siteId, listKey)
+  const unbanCommenter = useUnbanCommenter<CommenterWithStats>(siteId, listKey)
+  const deleteAllCommentsByCommenter =
+    useDeleteAllCommentsByCommenter<CommenterWithStats>(siteId, listKey)
+  const toggleCommenterNotifications =
+    useToggleCommenterNotifications<CommenterWithStats>(siteId, listKey)
+
+  function isBusy(commenterId: string) {
+    return (
+      (banCommenter.isPending && banCommenter.variables === commenterId) ||
+      (unbanCommenter.isPending && unbanCommenter.variables === commenterId) ||
+      (deleteAllCommentsByCommenter.isPending &&
+        deleteAllCommentsByCommenter.variables === commenterId) ||
+      (toggleCommenterNotifications.isPending &&
+        toggleCommenterNotifications.variables?.commenterId === commenterId)
+    )
+  }
 
   function openConfirm(action: ConfirmAction, commenter: CommenterWithStats) {
     setConfirmAction(action)
@@ -78,96 +95,49 @@ export function UsersTable({
     setConfirmTarget(null)
   }
 
-  async function handleDeleteAll() {
+  function handleDeleteAll() {
     if (!confirmTarget) return
     const commenterId = confirmTarget.id
-    const original = optimisticCommenters.find((c) => c.id === commenterId)
-    if (!original) return
-
-    updateItem((c) => c.id === commenterId, {
-      deletedCount: original.totalCount - original.spamCount,
-    })
-    setBusy(commenterId, true)
     closeConfirm()
 
-    try {
-      await deleteAllCommentsByCommenter(siteId, commenterId)
-      toast.success("All comments deleted")
-    } catch {
-      revertItem((c) => c.id === commenterId, original)
-      toast.error("Failed to delete comments")
-    } finally {
-      setBusy(commenterId, false)
-    }
+    deleteAllCommentsByCommenter.mutate(commenterId, {
+      onSuccess: () => toast.success("All comments deleted"),
+      onError: () => toast.error("Failed to delete comments"),
+    })
   }
 
-  async function handleBan() {
+  function handleBan() {
     if (!confirmTarget) return
     const commenterId = confirmTarget.id
-    const original = optimisticCommenters.find((c) => c.id === commenterId)
-    if (!original) return
-
-    updateItem((c) => c.id === commenterId, {
-      isBanned: true,
-    })
-    setBusy(commenterId, true)
     closeConfirm()
 
-    try {
-      await banCommenter(siteId, commenterId)
-      toast.success("User banned")
-    } catch {
-      revertItem((c) => c.id === commenterId, original)
-      toast.error("Failed to ban user")
-    } finally {
-      setBusy(commenterId, false)
-    }
-  }
-
-  async function handleToggleNotifications(
-    commenterId: string,
-    enabled: boolean
-  ) {
-    const original = optimisticCommenters.find((c) => c.id === commenterId)
-    if (!original) return
-
-    updateItem((c) => c.id === commenterId, { notificationsEnabled: enabled })
-    setBusy(commenterId, true)
-
-    try {
-      await toggleCommenterNotifications(siteId, commenterId, enabled)
-      toast.success(
-        enabled ? "Notifications enabled" : "Notifications disabled"
-      )
-    } catch {
-      revertItem((c) => c.id === commenterId, original)
-      toast.error("Failed to update notification preference")
-    } finally {
-      setBusy(commenterId, false)
-    }
-  }
-
-  async function handleUnban(commenterId: string) {
-    const original = optimisticCommenters.find((c) => c.id === commenterId)
-    if (!original) return
-
-    updateItem((c) => c.id === commenterId, {
-      isBanned: false,
+    banCommenter.mutate(commenterId, {
+      onSuccess: () => toast.success("User banned"),
+      onError: () => toast.error("Failed to ban user"),
     })
-    setBusy(commenterId, true)
-
-    try {
-      await unbanCommenter(siteId, commenterId)
-      toast.success("Ban removed")
-    } catch {
-      revertItem((c) => c.id === commenterId, original)
-      toast.error("Failed to remove ban")
-    } finally {
-      setBusy(commenterId, false)
-    }
   }
 
-  if (optimisticCommenters.length === 0) {
+  function handleToggleNotifications(commenterId: string, enabled: boolean) {
+    toggleCommenterNotifications.mutate(
+      { commenterId, notificationsEnabled: enabled },
+      {
+        onSuccess: () =>
+          toast.success(
+            enabled ? "Notifications enabled" : "Notifications disabled"
+          ),
+        onError: () => toast.error("Failed to update notification preference"),
+      }
+    )
+  }
+
+  function handleUnban(commenterId: string) {
+    unbanCommenter.mutate(commenterId, {
+      onSuccess: () => toast.success("Ban removed"),
+      onError: () => toast.error("Failed to remove ban"),
+    })
+  }
+
+  if (liveCommenters.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
         <p className="text-sm text-muted-foreground">No users found</p>
@@ -191,7 +161,7 @@ export function UsersTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {optimisticCommenters.map((commenter) => (
+            {liveCommenters.map((commenter) => (
               <TableRow
                 key={commenter.id}
                 className="cursor-pointer"

@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
-import {
-  patchCommentStatus,
-  type ClientCommentStatus,
-} from "@/lib/services/comment-client"
+import type { ClientCommentStatus } from "@/lib/queries/comments"
+import { useUpdateCommentStatus } from "@/lib/queries/comments"
+import { useCommenterComments } from "@/lib/queries/users"
 import {
   Dialog,
   DialogContent,
@@ -62,37 +61,35 @@ const STATUS_BADGE: Record<
 }
 
 export function UserProfileDialog({ open, onClose, commenter, siteId }: Props) {
-  const [comments, setComments] = useState<CommentItem[] | null>(null)
+  const [overrides, setOverrides] = useState<
+    Record<string, ClientCommentStatus>
+  >({})
+  const updateStatus = useUpdateCommentStatus<CommentItem>(
+    `profile:${siteId}:${commenter?.id ?? ""}`
+  )
+  const { data, isError } = useCommenterComments(siteId, commenter?.id, open)
 
   useEffect(() => {
-    if (open && commenter) {
-      fetch(`/api/v1/sites/${siteId}/users/${commenter.id}/comments`)
-        .then(async (res) => {
-          if (!res.ok) throw new Error("Failed to load")
-          return res.json()
-        })
-        .then((data) => {
-          setComments(data)
-        })
-        .catch(() => {
-          toast.error("Failed to load comments")
-        })
-    }
-  }, [open, commenter, siteId])
+    if (isError) toast.error("Failed to load comments")
+  }, [isError])
 
-  async function handleStatusChange(
-    commentId: string,
-    status: ClientCommentStatus
-  ) {
-    try {
-      await patchCommentStatus(commentId, status)
-      setComments((prev) =>
-        (prev ?? []).map((c) => (c.id === commentId ? { ...c, status } : c))
-      )
-      toast.success(`Comment ${status.toLowerCase()}`)
-    } catch {
-      toast.error("Action failed")
-    }
+  const comments: CommentItem[] | null = data
+    ? data.map((c) => ({ ...c, status: overrides[c.id] ?? c.status }))
+    : null
+
+  function handleStatusChange(commentId: string, status: ClientCommentStatus) {
+    updateStatus.mutate(
+      { id: commentId, status },
+      {
+        onSuccess: () => {
+          setOverrides((prev) => ({ ...prev, [commentId]: status }))
+          toast.success(`Comment ${status.toLowerCase()}`)
+        },
+        onError: () => {
+          toast.error("Action failed")
+        },
+      }
+    )
   }
 
   if (!commenter) return null
