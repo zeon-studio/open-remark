@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -14,23 +13,21 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import type { SiteRole, GrantableSiteRole } from "@/lib/permissions"
-
-type Member = {
-  userId: string
-  role: SiteRole
-  name: string | null
-  email: string | null
-  image: string | null
-}
-type Invite = { id: string; email: string; role: SiteRole }
+import { ApiClientError } from "@/lib/api-client"
+import {
+  useTeam,
+  useInviteMember,
+  useRemoveMember,
+  useRevokeInvite,
+  type Team,
+} from "@/lib/queries/team"
 
 type Props = {
   siteId: string
   currentUserId: string
   myRole: SiteRole
   grantableRoles: GrantableSiteRole[]
-  members: Member[]
-  invites: Invite[]
+  initialTeam: Team
 }
 
 const ROLE_LABEL: Record<SiteRole, string> = {
@@ -43,36 +40,24 @@ export function TeamManager({
   siteId,
   currentUserId,
   grantableRoles,
-  members,
-  invites,
+  initialTeam,
 }: Props) {
-  const router = useRouter()
+  const { data } = useTeam(siteId, initialTeam)
+  const { members, invites } = data
+  const inviteMember = useInviteMember(siteId)
+  const removeMember = useRemoveMember(siteId)
+  const revokeInvite = useRevokeInvite(siteId)
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<GrantableSiteRole>(
     grantableRoles[0] ?? "SITE_MODERATOR"
   )
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function send(method: string, path: string, body: unknown) {
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await fetch(path, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? "Request failed")
-      }
-      router.refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed")
-    } finally {
-      setBusy(false)
-    }
+  const busy =
+    inviteMember.isPending || removeMember.isPending || revokeInvite.isPending
+
+  function errorMessage(err: unknown) {
+    return err instanceof ApiClientError ? err.message : "Request failed"
   }
 
   return (
@@ -90,8 +75,13 @@ export function TeamManager({
         onSubmit={(e) => {
           e.preventDefault()
           if (!email) return
-          send("POST", `/api/v1/sites/${siteId}/invites`, { email, role }).then(
-            () => setEmail("")
+          setError(null)
+          inviteMember.mutate(
+            { email, role },
+            {
+              onSuccess: () => setEmail(""),
+              onError: (err) => setError(errorMessage(err)),
+            }
           )
         }}
       >
@@ -150,11 +140,12 @@ export function TeamManager({
                   variant="ghost"
                   size="sm"
                   disabled={busy}
-                  onClick={() =>
-                    send("DELETE", `/api/v1/sites/${siteId}/members`, {
-                      userId: m.userId,
+                  onClick={() => {
+                    setError(null)
+                    removeMember.mutate(m.userId, {
+                      onError: (err) => setError(errorMessage(err)),
                     })
-                  }
+                  }}
                 >
                   Remove
                 </Button>
@@ -181,11 +172,12 @@ export function TeamManager({
                   variant="ghost"
                   size="sm"
                   disabled={busy}
-                  onClick={() =>
-                    send("DELETE", `/api/v1/sites/${siteId}/invites`, {
-                      inviteId: i.id,
+                  onClick={() => {
+                    setError(null)
+                    revokeInvite.mutate(i.id, {
+                      onError: (err) => setError(errorMessage(err)),
                     })
-                  }
+                  }}
                 >
                   Revoke
                 </Button>

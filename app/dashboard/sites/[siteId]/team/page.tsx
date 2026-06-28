@@ -38,18 +38,20 @@ export default async function TeamPage({ params }: Props) {
         currentUserId={session!.user!.id}
         myRole={role!}
         grantableRoles={[...GRANTABLE_SITE_ROLES[role!]]}
-        members={members.map((m) => ({
-          userId: m.userId,
-          role: m.role,
-          name: m.user.name,
-          email: m.user.email,
-          image: m.user.image,
-        }))}
-        invites={invites.map((i) => ({
-          id: i.id,
-          email: i.email,
-          role: i.role,
-        }))}
+        initialTeam={{
+          members: members.map((m) => ({
+            userId: m.userId,
+            role: m.role,
+            name: m.user.name,
+            email: m.user.email,
+            image: m.user.image,
+          })),
+          invites: invites.map((i) => ({
+            id: i.id,
+            email: i.email,
+            role: i.role,
+          })),
+        }}
       />
     </div>
   )
