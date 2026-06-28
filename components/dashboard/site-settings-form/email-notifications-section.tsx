@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useUpdateSite } from "@/lib/queries/sites"
 import type { Site } from "./types"
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
 }
 
 export function EmailNotificationsSection({ site }: Props) {
+  const updateSite = useUpdateSite(site.id)
   const [emailEnabled, setEmailEnabled] = useState(
     site.emailNotificationsEnabled
   )
@@ -61,7 +63,6 @@ export function EmailNotificationsSection({ site }: Props) {
   // If SMTP config is removed, auto-disable notifications
   if (!smtpConfigured && emailEnabled) setEmailEnabled(false)
 
-  const [savingEmail, setSavingEmail] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewType, setPreviewType] = useState<"new-comment" | "reply">(
     "new-comment"
@@ -69,36 +70,30 @@ export function EmailNotificationsSection({ site }: Props) {
   const [previewHtml, setPreviewHtml] = useState("")
   const [previewLoading, setPreviewLoading] = useState(false)
 
-  async function handleSaveEmail() {
-    setSavingEmail(true)
-    try {
-      const res = await fetch(`/api/v1/sites/${site.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          emailNotificationsEnabled: emailEnabled,
-          likeNotificationLimit: Math.max(
-            0,
-            Math.min(100, parseInt(likeNotificationLimit, 10) || 0)
-          ),
-          emailSubjectPrefix: emailSubjectPrefix || null,
-          emailLogoUrl: emailLogoUrl || null,
-          emailAccentColor: emailAccentColor || null,
-          emailFooterText: emailFooterText || null,
-          smtpHost: smtpHost || null,
-          smtpPort: smtpPort ? parseInt(smtpPort, 10) : null,
-          smtpUser: smtpUser || null,
-          smtpPass: smtpPass || null,
-          smtpFrom: smtpFrom || null,
-        }),
-      })
-      if (!res.ok) throw new Error("Failed to save")
-      toast.success("Email settings saved")
-    } catch {
-      toast.error("Failed to save email settings")
-    } finally {
-      setSavingEmail(false)
-    }
+  function handleSaveEmail() {
+    updateSite.mutate(
+      {
+        emailNotificationsEnabled: emailEnabled,
+        likeNotificationLimit: Math.max(
+          0,
+          Math.min(100, parseInt(likeNotificationLimit, 10) || 0)
+        ),
+        emailSubjectPrefix: emailSubjectPrefix || null,
+        emailLogoUrl: emailLogoUrl || null,
+        emailAccentColor: emailAccentColor || null,
+        emailFooterText: emailFooterText || null,
+        smtpHost: smtpHost || null,
+        smtpPort: smtpPort ? parseInt(smtpPort, 10) : null,
+        smtpUser: smtpUser || null,
+        smtpPass: smtpPass || null,
+        smtpFrom: smtpFrom || null,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Email settings saved")
+        },
+      }
+    )
   }
 
   async function handlePreview(type: "new-comment" | "reply") {
@@ -324,8 +319,14 @@ export function EmailNotificationsSection({ site }: Props) {
           <Separator />
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button onClick={handleSaveEmail} disabled={savingEmail} size="sm">
-              {savingEmail && <Loader2 className="mr-2 size-4 animate-spin" />}
+            <Button
+              onClick={handleSaveEmail}
+              disabled={updateSite.isPending}
+              size="sm"
+            >
+              {updateSite.isPending && (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              )}
               Save
             </Button>
             <Button

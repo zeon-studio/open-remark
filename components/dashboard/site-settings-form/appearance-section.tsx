@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useUpdateSite } from "@/lib/queries/sites"
 import type { Site, Theme } from "./types"
 
 const PRESET_COLORS = [
@@ -27,35 +28,28 @@ const PRESET_COLORS = [
 
 type Props = {
   site: Site
-  onSiteChange: (site: Site) => void
 }
 
-export function AppearanceSection({ site, onSiteChange }: Props) {
+export function AppearanceSection({ site }: Props) {
+  const updateSite = useUpdateSite(site.id)
   const [theme, setTheme] = useState<Theme>(site.theme)
   const [primaryColor, setPrimaryColor] = useState(site.primaryColor)
   const [radius, setRadius] = useState(site.radius)
-  const [savingAppearance, setSavingAppearance] = useState(false)
 
   const appearanceDirty =
     theme !== site.theme ||
     primaryColor !== site.primaryColor ||
     radius !== site.radius
 
-  async function handleSaveAppearance() {
-    setSavingAppearance(true)
-    const res = await fetch(`/api/v1/sites/${site.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme, primaryColor, radius }),
-    })
-
-    if (res.ok) {
-      toast.success("Appearance saved")
-      onSiteChange(await res.json())
-    } else {
-      toast.error("Failed to save appearance")
-    }
-    setSavingAppearance(false)
+  function handleSaveAppearance() {
+    updateSite.mutate(
+      { theme, primaryColor, radius },
+      {
+        onSuccess: () => {
+          toast.success("Appearance saved")
+        },
+      }
+    )
   }
 
   return (
@@ -184,9 +178,9 @@ export function AppearanceSection({ site, onSiteChange }: Props) {
         <div className="flex items-center gap-2 pt-2">
           <Button
             onClick={handleSaveAppearance}
-            disabled={!appearanceDirty || savingAppearance}
+            disabled={!appearanceDirty || updateSite.isPending}
           >
-            {savingAppearance ? "Saving…" : "Save appearance"}
+            {updateSite.isPending ? "Saving…" : "Save appearance"}
           </Button>
           {appearanceDirty && (
             <Button
