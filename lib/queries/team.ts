@@ -18,14 +18,31 @@ export const teamKeys = {
   detail: (siteId: string) => ["team", siteId] as const,
 }
 
+// GET /api/v1/sites/:siteId/members returns raw SiteMember rows with a
+// nested `user` relation, not the flat Member shape the UI uses — flatten
+// it here so a background refetch doesn't blow away the server-rendered
+// names/emails/avatars with `undefined`.
+type MemberRow = {
+  userId: string
+  role: SiteRole
+  user: { name: string | null; email: string | null; image: string | null }
+}
+
 export function useTeam(siteId: string, initialData: Team) {
   return useQuery({
     queryKey: teamKeys.detail(siteId),
     queryFn: async () => {
-      const [members, invites] = await Promise.all([
-        apiFetch<Member[]>(`/api/v1/sites/${siteId}/members`),
+      const [rows, invites] = await Promise.all([
+        apiFetch<MemberRow[]>(`/api/v1/sites/${siteId}/members`),
         apiFetch<Invite[]>(`/api/v1/sites/${siteId}/invites`),
       ])
+      const members: Member[] = rows.map((r) => ({
+        userId: r.userId,
+        role: r.role,
+        name: r.user.name,
+        email: r.user.email,
+        image: r.user.image,
+      }))
       return { members, invites }
     },
     initialData,
