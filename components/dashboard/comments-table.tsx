@@ -4,11 +4,11 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 import {
-  patchCommentStatus,
-  patchCommentBody,
-  bulkPatchCommentStatus,
-} from "@/lib/services/comment-client"
-import { useOptimisticState } from "@/hooks/use-optimistic-state"
+  useCommentList,
+  useUpdateCommentStatus,
+  useUpdateCommentBody,
+  useBulkUpdateCommentStatus,
+} from "@/lib/queries/comments"
 import {
   Table,
   TableBody,
@@ -70,7 +70,7 @@ type Comment = {
 
 type Props = {
   comments: Comment[]
-  onStatusChange?: () => void
+  listKey: string
 }
 
 const STATUS_BADGE: Record<
@@ -97,29 +97,33 @@ const STATUS_BADGE: Record<
   },
 }
 
-export function CommentsTable({ comments, onStatusChange }: Props) {
+export function CommentsTable({ comments, listKey }: Props) {
   const [preview, setPreview] = useState<Comment | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null)
   const [editTarget, setEditTarget] = useState<Comment | null>(null)
   const [editBody, setEditBody] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<"DELETE" | "SPAM" | null>(null)
-  const [bulkBusy, setBulkBusy] = useState(false)
 
-  const {
-    data: optimisticComments,
-    updateItem,
-    revertItem,
-    setBusy,
-    isBusy,
-  } = useOptimisticState<Comment>(comments)
+  const { data: liveComments } = useCommentList<Comment>(listKey, comments)
+  const updateStatus = useUpdateCommentStatus<Comment>(listKey)
+  const updateBody = useUpdateCommentBody<Comment>(listKey)
+  const bulkUpdateStatus = useBulkUpdateCommentStatus<Comment>(listKey)
+  const bulkBusy = bulkUpdateStatus.isPending
+
+  function isBusy(id: string) {
+    return (
+      (updateStatus.isPending && updateStatus.variables?.id === id) ||
+      (updateBody.isPending && updateBody.variables?.id === id)
+    )
+  }
 
   const selectableIds = useMemo(
     () =>
-      optimisticComments
+      liveComments
         .filter((c) => c.status !== COMMENT_STATUS.DELETED)
         .map((c) => c.id),
-    [optimisticComments]
+    [liveComments]
   )
 
   const allSelected =
@@ -139,74 +143,53 @@ export function CommentsTable({ comments, onStatusChange }: Props) {
     })
   }
 
-  async function runBulk(status: CommentStatus) {
+  function runBulk(status: CommentStatus) {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
 
-    const originals = optimisticComments.filter((c) => selectedIds.has(c.id))
-    originals.forEach((o) => {
-      updateItem((c) => c.id === o.id, { status })
-      setBusy(o.id, true)
-    })
-    setBulkBusy(true)
+    bulkUpdateStatus.mutate(
+      { ids, status },
+      {
+        onSuccess: () => {
+          toast.success(
+            `${ids.length} comment${ids.length === 1 ? "" : "s"} ${status.toLowerCase()}`
+          )
+          setSelectedIds(new Set())
+        },
+        onError: () => toast.error("Bulk action failed. Changes reverted."),
+        onSettled: () => setBulkAction(null),
+      }
+    )
+  }
 
-    try {
-      await bulkPatchCommentStatus(ids, status)
-      toast.success(
-        `${ids.length} comment${ids.length === 1 ? "" : "s"} ${status.toLowerCase()}`
+  function handleStatusChange(
+    id: string,
+    status: CommentStatus
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      updateStatus.mutate(
+        { id, status },
+        {
+          onSuccess: () => toast.success(`Comment ${status.toLowerCase()}`),
+          onError: () => toast.error("Action failed. Changes reverted."),
+          onSettled: () => resolve(),
+        }
       )
-      setSelectedIds(new Set())
-      onStatusChange?.()
-    } catch {
-      originals.forEach((o) => revertItem((c) => c.id === o.id, o))
-      toast.error("Bulk action failed. Changes reverted.")
-    } finally {
-      originals.forEach((o) => setBusy(o.id, false))
-      setBulkBusy(false)
-      setBulkAction(null)
-    }
+    })
   }
 
-  async function handleStatusChange(id: string, status: CommentStatus) {
-    const original = optimisticComments.find((c) => c.id === id)
-    if (!original) return
-
-    updateItem((c) => c.id === id, { status })
-    setBusy(id, true)
-
-    try {
-      await patchCommentStatus(id, status)
-      toast.success(`Comment ${status.toLowerCase()}`)
-      onStatusChange?.()
-    } catch {
-      revertItem((c) => c.id === id, original)
-      toast.error("Action failed. Changes reverted.")
-    } finally {
-      setBusy(id, false)
-    }
-  }
-
-  async function handleBodyUpdate(id: string, body: string) {
-    const original = optimisticComments.find((c) => c.id === id)
-    if (!original) return
-
-    updateItem((c) => c.id === id, { body, editedAt: new Date() })
+  function handleBodyUpdate(id: string, body: string) {
     setEditTarget(null)
-    setBusy(id, true)
-
-    try {
-      await patchCommentBody(id, body)
-      toast.success("Comment updated")
-      onStatusChange?.()
-    } catch {
-      revertItem((c) => c.id === id, original)
-      toast.error("Update failed. Changes reverted.")
-    } finally {
-      setBusy(id, false)
-    }
+    updateBody.mutate(
+      { id, body },
+      {
+        onSuccess: () => toast.success("Comment updated"),
+        onError: () => toast.error("Update failed. Changes reverted."),
+      }
+    )
   }
 
-  if (optimisticComments.length === 0) {
+  if (liveComments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
         <p className="text-sm text-muted-foreground">No comments found</p>
@@ -279,7 +262,7 @@ export function CommentsTable({ comments, onStatusChange }: Props) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {optimisticComments.map((comment) => {
+            {liveComments.map((comment) => {
               const badge = STATUS_BADGE[comment.status]
               const isDeleted = comment.status === COMMENT_STATUS.DELETED
               return (

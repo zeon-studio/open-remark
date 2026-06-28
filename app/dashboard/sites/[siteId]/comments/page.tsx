@@ -214,6 +214,7 @@ async function CommentsArea({
 
       <CommentsTable
         comments={comments as Parameters<typeof CommentsTable>[0]["comments"]}
+        listKey={`${siteId}:${activeStatus ?? "ALL"}|${slug ?? ""}|${currentPage}|${search ?? ""}`}
       />
 
       {/* Pagination */}
