@@ -31,18 +31,35 @@ export function useCreateSite() {
   })
 }
 
+// Wire shape for PATCH /api/v1/sites/:id — mirrors UpdateSiteSchema. Differs
+// from the `Site` response type for `allowedOrigins`: the API accepts/returns
+// it as a JSON-stringified array, but the PATCH body must send a real array.
+type UpdateSiteInput = Partial<Omit<Site, "allowedOrigins">> & {
+  allowedOrigins?: string[]
+}
+
 export function useUpdateSite(id: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: Partial<Site>) =>
+    mutationFn: (body: UpdateSiteInput) =>
       apiFetch<Site>(`/api/v1/sites/${id}`, {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
     onMutate: async (body) => {
+      await qc.cancelQueries({ queryKey: siteKeys.detail(id) })
+      const { allowedOrigins, ...rest } = body
       const previous = qc.getQueryData<Site>(siteKeys.detail(id))
       qc.setQueryData<Site>(siteKeys.detail(id), (old) =>
-        old ? { ...old, ...body } : old
+        old
+          ? {
+              ...old,
+              ...rest,
+              ...(allowedOrigins && {
+                allowedOrigins: JSON.stringify(allowedOrigins),
+              }),
+            }
+          : old
       )
       return { previous }
     },

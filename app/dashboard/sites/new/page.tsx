@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/dashboard/page-header"
@@ -14,14 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useCreateSite } from "@/lib/queries/sites"
 
 export default function NewSitePage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const createSite = useCreateSite()
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setLoading(true)
 
     const form = new FormData(e.currentTarget)
     const domain = (form.get("domain") as string) ?? ""
@@ -38,23 +37,13 @@ export default function NewSitePage() {
       allowedOrigins: origin ? [origin] : [],
     }
 
-    const res = await fetch("/api/v1/sites", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+    createSite.mutate(body, {
+      onSuccess: (site) => {
+        toast.success("Site created!")
+        router.push(`/dashboard/sites/${site.id}/install`)
+        router.refresh()
+      },
     })
-
-    if (res.ok) {
-      const site = await res.json()
-      toast.success("Site created!")
-      router.push(`/dashboard/sites/${site.id}/install`)
-      router.refresh()
-    } else {
-      const err = await res.json()
-      toast.error(err.error ?? "Failed to create site")
-    }
-
-    setLoading(false)
   }
 
   return (
@@ -115,8 +104,8 @@ export default function NewSitePage() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Creating…" : "Create site"}
+                <Button type="submit" disabled={createSite.isPending}>
+                  {createSite.isPending ? "Creating…" : "Create site"}
                 </Button>
                 <Button
                   type="button"
