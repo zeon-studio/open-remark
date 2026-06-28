@@ -27,7 +27,7 @@ import {
   RiExternalLinkLine,
   RiSearchLine,
 } from "@remixicon/react"
-import { deletePage } from "@/lib/services/comment-client"
+import { useDeletePage } from "@/lib/queries/pages"
 
 type Page = { id: string; slug: string; url?: string; count: number }
 
@@ -47,12 +47,12 @@ export function PagesFilterPanel({
   search,
 }: Props) {
   const router = useRouter()
+  const deletePage = useDeletePage(siteId)
   const [collapsed, setCollapsed] = useState(false)
   const [filter, setFilter] = useState("")
   const [target, setTarget] = useState<Page | null>(null)
   const [typed, setTyped] = useState("")
   const [copied, setCopied] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
   const filteredPages = filter
     ? pages.filter((p) => p.slug.toLowerCase().includes(filter.toLowerCase()))
@@ -67,7 +67,7 @@ export function PagesFilterPanel({
   }
 
   function closeDialog() {
-    if (deleting) return
+    if (deletePage.isPending) return
     setTarget(null)
     setTyped("")
     setCopied(false)
@@ -84,25 +84,25 @@ export function PagesFilterPanel({
     }
   }
 
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!target || typed !== target.slug) return
-    setDeleting(true)
-    try {
-      await deletePage(siteId, target.id)
-      toast.success(`Deleted "${target.slug}"`)
-      const wasActive = activeSlug === target.slug
-      setTarget(null)
-      setTyped("")
-      if (wasActive) {
-        router.push(`/dashboard/sites/${siteId}/comments`)
-      } else {
-        router.refresh()
-      }
-    } catch {
-      toast.error("Failed to delete page")
-    } finally {
-      setDeleting(false)
-    }
+    const slug = target.slug
+    deletePage.mutate(target.id, {
+      onSuccess: () => {
+        toast.success(`Deleted "${slug}"`)
+        const wasActive = activeSlug === slug
+        setTarget(null)
+        setTyped("")
+        if (wasActive) {
+          router.push(`/dashboard/sites/${siteId}/comments`)
+        } else {
+          router.refresh()
+        }
+      },
+      onError: () => {
+        toast.error("Failed to delete page")
+      },
+    })
   }
 
   function pageHref(slug: string | null) {
@@ -132,7 +132,7 @@ export function PagesFilterPanel({
     )
   }
 
-  const canConfirm = !!target && typed === target.slug && !deleting
+  const canConfirm = !!target && typed === target.slug && !deletePage.isPending
 
   return (
     <div className="sticky top-22 flex h-[calc(100svh-5.5rem)] w-[230px] shrink-0 flex-col border-r bg-background">
@@ -289,7 +289,7 @@ export function PagesFilterPanel({
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder="Paste or type the page name"
-              disabled={deleting}
+              disabled={deletePage.isPending}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && canConfirm) confirmDelete()
               }}
@@ -297,7 +297,11 @@ export function PagesFilterPanel({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog} disabled={deleting}>
+            <Button
+              variant="outline"
+              onClick={closeDialog}
+              disabled={deletePage.isPending}
+            >
               Cancel
             </Button>
             <Button
@@ -305,7 +309,7 @@ export function PagesFilterPanel({
               onClick={confirmDelete}
               disabled={!canConfirm}
             >
-              {deleting ? "Deleting…" : "Delete page"}
+              {deletePage.isPending ? "Deleting…" : "Delete page"}
             </Button>
           </DialogFooter>
         </DialogContent>
