@@ -14,6 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { ApiClientError } from "@/lib/api-client"
+import { useLookupUser, useTransferSite } from "@/lib/queries/sites"
 
 type TransferStep =
   | "idle"
@@ -29,6 +31,8 @@ type Props = {
 
 export function TransferSection({ siteId }: Props) {
   const router = useRouter()
+  const lookupUser = useLookupUser()
+  const transferSite = useTransferSite(siteId)
   const [transferEmail, setTransferEmail] = useState("")
   const [transferStep, setTransferStep] = useState<TransferStep>("idle")
   const [transferRecipient, setTransferRecipient] = useState<{
@@ -44,55 +48,42 @@ export function TransferSection({ siteId }: Props) {
     }
   }, [])
 
-  async function handleLookup() {
+  function handleLookup() {
     setTransferStep("looking")
     setTransferError("")
-    try {
-      const res = await fetch(
-        `/api/v1/users/lookup?email=${encodeURIComponent(transferEmail)}`
-      )
-      if (res.ok) {
-        const user = (await res.json()) as {
-          id: string
-          name: string | null
-          email: string
-        }
+    lookupUser.mutate(transferEmail, {
+      onSuccess: (user) => {
         setTransferRecipient({ name: user.name, email: user.email })
         setTransferStep("looked-up")
-      } else {
-        const data = (await res.json()) as { error?: string }
-        setTransferError(data.error ?? "No user found with that email.")
+      },
+      onError: (err) => {
+        setTransferError(
+          err instanceof ApiClientError
+            ? err.message
+            : "No user found with that email."
+        )
         setTransferStep("error")
-      }
-    } catch {
-      setTransferError("Network error. Please try again.")
-      setTransferStep("error")
-    }
+      },
+    })
   }
 
-  async function handleTransfer() {
+  function handleTransfer() {
     setTransferStep("transferring")
-    try {
-      const res = await fetch(`/api/v1/sites/${siteId}/transfer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: transferEmail }),
-      })
-      if (res.ok) {
+    transferSite.mutate(transferEmail, {
+      onSuccess: () => {
         setTransferStep("success")
         transferTimerRef.current = setTimeout(() => {
           router.push("/dashboard/sites")
           router.refresh()
         }, 3000)
-      } else {
-        const data = (await res.json()) as { error?: string }
-        toast.error(data.error ?? "Transfer failed")
+      },
+      onError: (err) => {
+        toast.error(
+          err instanceof ApiClientError ? err.message : "Transfer failed"
+        )
         setTransferStep("looked-up")
-      }
-    } catch {
-      toast.error("Network error. Transfer failed.")
-      setTransferStep("looked-up")
-    }
+      },
+    })
   }
 
   return (
