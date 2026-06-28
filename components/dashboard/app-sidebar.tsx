@@ -230,7 +230,10 @@ export function AppSidebar({ user, siteCount, platformRole }: Props) {
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
                   <Avatar className="size-7 shrink-0">
-                    <AvatarImage src={user.image ?? ""} alt={user.name ?? ""} />
+                    <AvatarImage
+                      src={user.image ?? undefined}
+                      alt={user.name ?? ""}
+                    />
                     <AvatarFallback className="bg-sidebar-primary/10 text-xs font-semibold text-sidebar-primary">
                       {initials}
                     </AvatarFallback>

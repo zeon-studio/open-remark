@@ -121,7 +121,7 @@ export function TeamManager({
           {members.map((m) => (
             <li key={m.userId} className="flex items-center gap-3 p-3">
               <Avatar className="size-8">
-                <AvatarImage src={m.image ?? ""} alt={m.name ?? ""} />
+                <AvatarImage src={m.image ?? undefined} alt={m.name ?? ""} />
                 <AvatarFallback>
                   {(m.name ?? m.email ?? "U").slice(0, 1).toUpperCase()}
                 </AvatarFallback>

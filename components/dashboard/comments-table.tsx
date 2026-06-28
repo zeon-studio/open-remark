@@ -283,7 +283,9 @@ export function CommentsTable({ comments, listKey }: Props) {
                   <TableCell>
                     <div className="flex min-w-0 items-center gap-2">
                       <Avatar className="size-7 shrink-0">
-                        <AvatarImage src={comment.commenter.image ?? ""} />
+                        <AvatarImage
+                          src={comment.commenter.image ?? undefined}
+                        />
                         <AvatarFallback className="text-xs">
                           {comment.commenter.name.slice(0, 2).toUpperCase()}
                         </AvatarFallback>

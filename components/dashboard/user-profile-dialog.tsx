@@ -100,7 +100,7 @@ export function UserProfileDialog({ open, onClose, commenter, siteId }: Props) {
         <DialogHeader>
           <div className="flex items-center gap-3">
             <Avatar className="size-10">
-              <AvatarImage src={commenter.image ?? ""} />
+              <AvatarImage src={commenter.image ?? undefined} />
               <AvatarFallback>
                 {commenter.name.slice(0, 2).toUpperCase()}
               </AvatarFallback>

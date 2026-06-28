@@ -170,7 +170,7 @@ export function UsersTable({
                 <TableCell>
                   <div className="flex min-w-0 items-center gap-2">
                     <Avatar className="size-7 shrink-0">
-                      <AvatarImage src={commenter.image ?? ""} />
+                      <AvatarImage src={commenter.image ?? undefined} />
                       <AvatarFallback className="text-xs">
                         {commenter.name.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
