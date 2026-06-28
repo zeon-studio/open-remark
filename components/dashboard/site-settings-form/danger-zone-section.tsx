@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -11,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useDeleteSite } from "@/lib/queries/sites"
 
 type Props = {
   siteId: string
@@ -18,23 +18,20 @@ type Props = {
 
 export function DangerZoneSection({ siteId }: Props) {
   const router = useRouter()
-  const [deleting, setDeleting] = useState(false)
+  const deleteSite = useDeleteSite(siteId)
 
-  async function handleDelete() {
+  function handleDelete() {
     if (
       !confirm("Delete this site and all its comments? This cannot be undone.")
     )
       return
-    setDeleting(true)
-    const res = await fetch(`/api/v1/sites/${siteId}`, { method: "DELETE" })
-    if (res.ok) {
-      toast.success("Site deleted")
-      router.push("/dashboard/sites")
-      router.refresh()
-    } else {
-      toast.error("Failed to delete")
-      setDeleting(false)
-    }
+    deleteSite.mutate(undefined, {
+      onSuccess: () => {
+        toast.success("Site deleted")
+        router.push("/dashboard/sites")
+        router.refresh()
+      },
+    })
   }
 
   return (
@@ -51,9 +48,9 @@ export function DangerZoneSection({ siteId }: Props) {
         <Button
           variant="destructive"
           onClick={handleDelete}
-          disabled={deleting}
+          disabled={deleteSite.isPending}
         >
-          {deleting ? "Deleting…" : "Delete site"}
+          {deleteSite.isPending ? "Deleting…" : "Delete site"}
         </Button>
       </CardContent>
     </Card>
