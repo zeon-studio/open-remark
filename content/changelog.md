@@ -2,6 +2,13 @@
 title: "Changelog"
 subtitle: "Notes from each release. Newest first."
 entries:
+  - version: "0.6.0"
+    date: "June 29, 2026"
+    changes:
+      - "Dashboard data fetching rebuilt on React Query — comments, users, sites, and team actions now apply instantly with automatic rollback if the request fails"
+      - "Failed requests now surface a consistent toast instead of failing silently"
+      - "Fixed the team page's member list going blank a moment after it loaded"
+      - "Fixed broken-image icons for commenters and team members without a profile photo"
   - version: "0.5.0"
     date: "June 16, 2026"
     changes:
