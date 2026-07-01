@@ -10,8 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import type { SiteRole } from "@/lib/permissions"
 
 type Members = Awaited<ReturnType<typeof listMembers>>
+
+const ROLE_LABEL: Record<SiteRole, string> = {
+  SITE_OWNER: "Owner",
+  SITE_ADMIN: "Admin",
+  SITE_MODERATOR: "Moderator",
+}
 
 export function ReadOnlyTeamList({ members }: { members: Members }) {
   if (members.length === 0) {
@@ -57,9 +64,7 @@ export function ReadOnlyTeamList({ members }: { members: Members }) {
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant="outline">
-                {member.role.replace("SITE_", "")}
-              </Badge>
+              <Badge variant="secondary">{ROLE_LABEL[member.role]}</Badge>
             </TableCell>
           </TableRow>
         ))}
