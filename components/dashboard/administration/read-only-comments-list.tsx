@@ -1,5 +1,6 @@
 // components/dashboard/administration/read-only-comments-list.tsx
 import type { getCommentsBySite } from "@/lib/services/comment-service"
+import type { CommentStatus } from "@/generated/prisma/client"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -13,13 +14,31 @@ import {
 
 type Comments = Awaited<ReturnType<typeof getCommentsBySite>>["comments"]
 
-type BadgeVariant = "default" | "outline" | "secondary" | "destructive"
-
-const STATUS_VARIANT: Record<string, BadgeVariant> = {
-  PENDING: "outline",
-  APPROVED: "default",
-  SPAM: "destructive",
-  DELETED: "secondary",
+// Mirrors components/dashboard/comments-table.tsx's STATUS_BADGE so the
+// platform-owner read-only view renders identical badge colors to the
+// site-owner moderation view for the same comment status.
+const STATUS_BADGE: Record<
+  CommentStatus,
+  {
+    label: string
+    variant: "default" | "secondary" | "destructive" | "outline"
+    className?: string
+  }
+> = {
+  APPROVED: { label: "Approved", variant: "default" },
+  PENDING: { label: "Pending", variant: "secondary" },
+  SPAM: {
+    label: "Spam",
+    variant: "outline",
+    className:
+      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400",
+  },
+  DELETED: {
+    label: "Deleted",
+    variant: "outline",
+    className:
+      "border-border bg-muted text-muted-foreground line-through decoration-muted-foreground/40",
+  },
 }
 
 export function ReadOnlyCommentsList({ comments }: { comments: Comments }) {
@@ -68,8 +87,11 @@ export function ReadOnlyCommentsList({ comments }: { comments: Comments }) {
               {comment.page.slug}
             </TableCell>
             <TableCell>
-              <Badge variant={STATUS_VARIANT[comment.status]}>
-                {comment.status}
+              <Badge
+                variant={STATUS_BADGE[comment.status].variant}
+                className={STATUS_BADGE[comment.status].className}
+              >
+                {STATUS_BADGE[comment.status].label}
               </Badge>
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
