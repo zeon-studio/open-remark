@@ -1,19 +1,26 @@
+// app/dashboard/administration/page.tsx
 import { PageHeader } from "@/components/dashboard/page-header"
-import { Card, CardContent } from "@/components/ui/card"
+import { PlatformUsersTable } from "@/components/dashboard/administration/platform-users-table"
+import { UserSearchInput } from "@/components/dashboard/user-search-input"
+import { listPlatformUsers } from "@/lib/services/platform-admin-service"
 
-export default function AdministrationPage() {
+type Props = {
+  searchParams: Promise<{ search?: string }>
+}
+
+export default async function AdministrationPage({ searchParams }: Props) {
+  const { search } = await searchParams
+  const users = await listPlatformUsers({ search })
+
   return (
     <div>
       <PageHeader
         title="Administration"
-        description="Platform-level controls"
+        description="All registered users on this instance"
+        action={<UserSearchInput />}
       />
       <div className="p-6">
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Administration page coming soon.
-          </CardContent>
-        </Card>
+        <PlatformUsersTable users={users} />
       </div>
     </div>
   )
