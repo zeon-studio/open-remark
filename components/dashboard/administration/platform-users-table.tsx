@@ -19,6 +19,7 @@ export function PlatformUsersTable({ users }: Props) {
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>#</TableHead>
           <TableHead>User</TableHead>
           <TableHead>Role</TableHead>
           <TableHead>Sites</TableHead>
@@ -26,8 +27,11 @@ export function PlatformUsersTable({ users }: Props) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {users.map((user) => (
+        {users.map((user, index) => (
           <TableRow key={user.id}>
+            <TableCell className="text-sm text-muted-foreground tabular-nums">
+              {index + 1}
+            </TableCell>
             <TableCell>
               <Link
                 href={`/dashboard/administration/users/${user.id}`}

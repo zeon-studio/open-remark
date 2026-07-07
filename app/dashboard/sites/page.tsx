@@ -71,7 +71,7 @@ export default async function SitesPage() {
               {sites.map((site) => (
                 <Card
                   key={site.id}
-                  className="flex w-full flex-col gap-0 py-0 shadow-none transition-shadow hover:shadow-md"
+                  className="flex w-full flex-col gap-0 py-0 shadow-none transition-shadow hover:shadow-md hover:ring-ring/20 dark:hover:ring-ring/30"
                 >
                   {/* Header */}
                   <CardHeader className="flex flex-row items-start gap-3 p-5 pb-4">
