@@ -2,6 +2,13 @@
 title: "Changelog"
 subtitle: "Notes from each release. Newest first."
 entries:
+  - version: "0.6.1"
+    date: "July 7, 2026"
+    changes:
+      - "Serial number column on the Administration users list"
+      - "A user's site card in Administration now separates the two links: the domain opens the live site in a new tab, the rest of the card still opens the site's admin view"
+      - "Clearer hover highlight on site cards in both light and dark mode"
+      - "Removed the unused pg dependency"
   - version: "0.6.0"
     date: "June 29, 2026"
     changes:
