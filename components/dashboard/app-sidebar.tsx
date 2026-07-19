@@ -16,7 +16,9 @@ import {
   RiUserLine,
   RiMegaphoneLine,
   RiShieldUserLine,
+  RiQuestionLine,
 } from "@remixicon/react"
+import config from "@/config/config.json"
 import { platformCan, type PlatformRole } from "@/lib/permissions"
 import {
   Sidebar,
@@ -205,6 +207,25 @@ export function AppSidebar({ user, siteCount, platformRole }: Props) {
           <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
             <ProductHuntBadge className="flex justify-start px-2 py-1 [&_img]:h-auto [&_img]:w-full [&_img]:max-w-[180px]" />
           </SidebarMenuItem>
+          {config.need_help.enable && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip={config.need_help.label}>
+                <Link
+                  href={config.need_help.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <RiQuestionLine
+                    className="size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="group-data-[collapsible=icon]:hidden">
+                    {config.need_help.label}
+                  </span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip={resolvedTheme === "dark" ? "Dark mode" : "Light mode"}

@@ -24,6 +24,12 @@
     "product_tag_link": "<a href=\"https://www.producthunt.com/products/openremark?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-openremark\" target=\"_blank\" rel=\"noopener noreferrer\"><img alt=\"OpenRemark - An open-source comment system for static websites | Product Hunt\" width=\"250\" height=\"54\" src=\"https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1165618&amp;theme=light&amp;t=1780902903085\"></a>"
   },
 
+  "need_help": {
+    "enable": true,
+    "label": "Need Help?",
+    "link": "https://zeon.studio/estimate-project"
+  },
+
   "branding": {
     "enable": true,
     "_note": "powered_by_html must include class=\"z-footer-link\" to receive widget styles",

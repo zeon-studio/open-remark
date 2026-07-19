@@ -100,6 +100,17 @@ export default function HomePage() {
               </Link>
             </Button>
             <ProductHuntBadge className="hidden sm:block" />
+            {config.need_help.enable && (
+              <Button asChild variant="outline">
+                <Link
+                  href={config.need_help.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {config.need_help.label}
+                </Link>
+              </Button>
+            )}
             <Button asChild>
               <Link href="/sign-in">
                 Get started
