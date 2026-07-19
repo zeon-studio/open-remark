@@ -111,7 +111,7 @@ export default function HomePage() {
                 </Link>
               </Button>
             )}
-            <Button asChild>
+            <Button asChild className="hidden sm:inline-flex">
               <Link href="/sign-in">
                 Get started
                 <ArrowRight className="ml-1 size-4" aria-hidden="true" />
