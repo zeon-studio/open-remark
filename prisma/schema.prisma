@@ -178,6 +178,7 @@ model Comment {
 
   moderationLogs ModerationLog[]
 
+  @@index([pageId, parentId, status, createdAt])
   @@index([pageId, status, createdAt])
   @@index([parentId])
   @@index([commenterId])
