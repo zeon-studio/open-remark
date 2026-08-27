@@ -2,13 +2,23 @@ import { PrismaClient } from "@/generated/prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 
 function createPrismaClient() {
+  const rawUrl = process.env.DATABASE_URL
+  const isLocal =
+    !rawUrl || rawUrl.includes("localhost") || rawUrl.includes("127.0.0.1")
+
+  // For remote managed databases (Supabase, Neon, AWS RDS), remove conflicting sslmode query params
+  // so pg uses explicit SSL options with rejectUnauthorized: false.
+  const connectionString = isLocal || !rawUrl ? rawUrl : rawUrl.split("?")[0]
+
   const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
     max: 5,
     idleTimeoutMillis: 5000,
     connectionTimeoutMillis: 10000,
     allowExitOnIdle: true,
+    ssl: isLocal ? false : { rejectUnauthorized: false },
   })
+
   return new PrismaClient({ adapter })
 }
 
