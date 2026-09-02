@@ -722,7 +722,7 @@ export function renderCommentForm(
     : replyTo
       ? "Post reply"
       : "Post comment"
-  submitBtn.disabled = isSubmitting
+  submitBtn.disabled = isSubmitting || textarea.value.trim().length === 0
   submitBtn.addEventListener("click", async () => {
     const body = textarea.value.trim()
     if (!body || body.length > MAX_CHARS_COMMENT) {

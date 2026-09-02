@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { UpdateCommentSchema } from "@/lib/validators/comment"
 import {
   updateCommentBody,
@@ -41,9 +42,10 @@ export async function PATCH(
     const body = await req.json()
     const parsed = UpdateCommentSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.flatten() },
-        { status: 422 }
+      return buildCorsResponse(
+        req,
+        { error: z.flattenError(parsed.error) },
+        422
       )
     }
 
@@ -77,6 +79,6 @@ export async function PATCH(
 
     throw new ApiError("Invalid update", 400)
   } catch (err) {
-    return handleApiError(err)
+    return handleApiError(err, req.headers.get("origin") ?? undefined)
   }
 }

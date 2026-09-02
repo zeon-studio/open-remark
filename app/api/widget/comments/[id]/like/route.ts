@@ -52,6 +52,6 @@ export async function POST(
     const result = await toggleCommentLike(id, payload.sub)
     return buildCorsResponse(req, result)
   } catch (err) {
-    return handleApiError(err)
+    return handleApiError(err, req.headers.get("origin") ?? undefined)
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { CreateCommentSchema } from "@/lib/validators/comment"
 import appConfig from "@/config/config.json"
 import {
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (err) {
-    return handleApiError(err)
+    return handleApiError(err, req.headers.get("origin") ?? undefined)
   }
 }
 
@@ -98,9 +99,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const parsed = CreateCommentSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.flatten() },
-        { status: 422 }
+      return buildCorsResponse(
+        req,
+        { error: z.flattenError(parsed.error) },
+        422
       )
     }
 
@@ -124,6 +126,6 @@ export async function POST(req: NextRequest) {
 
     return buildCorsResponse(req, comment, 201)
   } catch (err) {
-    return handleApiError(err)
+    return handleApiError(err, req.headers.get("origin") ?? undefined)
   }
 }

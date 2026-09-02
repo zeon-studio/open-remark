@@ -17,12 +17,34 @@ export function isOriginAllowed(
   allowedOriginsJson: string
 ): boolean {
   if (!origin) return false
+
+  // Allow localhost / local loopback in development mode
+  if (
+    process.env.NODE_ENV !== "production" &&
+    (origin.startsWith("http://localhost:") ||
+      origin.startsWith("http://127.0.0.1:") ||
+      origin.startsWith("http://[::1]:"))
+  ) {
+    return true
+  }
+
   try {
     const allowed: string[] = JSON.parse(allowedOriginsJson)
     // No restrictions configured — allow all origins (useful for development
     // and for sites that haven't set up origin allow-listing yet).
     if (allowed.length === 0) return true
-    return allowed.some((o) => o === origin || o === "*")
+    return allowed.some((o) => {
+      if (o === "*" || o === origin) return true
+      if (o.includes("*")) {
+        const pattern = new RegExp(
+          "^" +
+            o.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*") +
+            "$"
+        )
+        return pattern.test(origin)
+      }
+      return false
+    })
   } catch {
     return false
   }

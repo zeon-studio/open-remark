@@ -30,9 +30,10 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const parsed = PatchSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.flatten() },
-        { status: 422 }
+      return buildCorsResponse(
+        req,
+        { error: z.flattenError(parsed.error) },
+        422
       )
     }
 
@@ -42,6 +43,6 @@ export async function PATCH(req: NextRequest) {
     )
     return buildCorsResponse(req, { ok: true })
   } catch (err) {
-    return handleApiError(err)
+    return handleApiError(err, req.headers.get("origin") ?? undefined)
   }
 }

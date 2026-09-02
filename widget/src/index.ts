@@ -124,6 +124,8 @@ class ZeonWidget {
   private deletingId: string | null = null
   private isSubmitting = false
   private isBanned = false
+  private actionError: string | null = null
+  private actionErrorTimer: ReturnType<typeof setTimeout> | null = null
   private notificationsEnabled = true
   private likingIds = new Set<string>()
   private usernameMap = new Map<string, Commenter>()
@@ -373,6 +375,7 @@ class ZeonWidget {
       this.buildCommentMap()
       this.replyTo = null
       this.replyingToId = null
+      this.actionError = null
     } catch (err: unknown) {
       this.handleApiError(err, "Failed to post")
     } finally {
@@ -457,7 +460,13 @@ class ZeonWidget {
       this.render()
       return
     }
-    this.renderErrorBanner(message)
+    if (this.actionErrorTimer) clearTimeout(this.actionErrorTimer)
+    this.actionError = message
+    this.actionErrorTimer = setTimeout(() => {
+      this.actionError = null
+      this.render()
+    }, 4000)
+    this.render()
   }
 
   private handleReplyClick(comment: CommentData) {
@@ -652,6 +661,8 @@ class ZeonWidget {
 
     if (this.auth.status === "error") {
       this.root.appendChild(renderError(this.auth.message))
+    } else if (this.actionError) {
+      this.root.appendChild(renderError(this.actionError))
     }
 
     this.root.appendChild(
