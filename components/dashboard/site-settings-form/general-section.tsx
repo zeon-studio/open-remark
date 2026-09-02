@@ -28,7 +28,15 @@ export function GeneralSection({ site }: Props) {
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean)
-      .map((s) => (s === "*" ? s : s.replace(/\/+$/, "")))
+      .map((s) => {
+        if (s === "*" || s.includes("*")) return s.replace(/\/+$/, "")
+        try {
+          const withProto = s.match(/^https?:\/\//i) ? s : `https://${s}`
+          return new URL(withProto).origin
+        } catch {
+          return s.replace(/\/+$/, "")
+        }
+      })
 
     setOriginsText(normalized.join("\n"))
 

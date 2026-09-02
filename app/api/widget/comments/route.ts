@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
     }
 
     const effectiveOrigin = getEffectiveOrigin(req)
-    if (!isOriginAllowed(effectiveOrigin, site.allowedOrigins)) {
+    if (!isOriginAllowed(effectiveOrigin, site.allowedOrigins, site.domain)) {
       throw new ApiError("Origin not allowed", 403)
     }
 

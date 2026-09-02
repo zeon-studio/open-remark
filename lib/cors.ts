@@ -12,19 +12,40 @@ export function getEffectiveOrigin(req: Request): string | null {
   return null
 }
 
+export function normalizeOrigin(input: string): string {
+  try {
+    const raw = input.trim()
+    if (raw === "*") return "*"
+    const withProto = raw.match(/^https?:\/\//i) ? raw : `https://${raw}`
+    return new URL(withProto).origin.toLowerCase()
+  } catch {
+    return input.trim().toLowerCase().replace(/\/+$/, "")
+  }
+}
+
 export function isOriginAllowed(
   origin: string | null,
-  allowedOriginsJson: string
+  allowedOriginsJson: string,
+  siteDomain?: string | null
 ): boolean {
   if (!origin) return false
+
+  const normalizedOrigin = normalizeOrigin(origin)
 
   // Allow localhost / local loopback in development mode
   if (
     process.env.NODE_ENV !== "production" &&
-    (origin.startsWith("http://localhost:") ||
-      origin.startsWith("http://127.0.0.1:") ||
-      origin.startsWith("http://[::1]:"))
+    (normalizedOrigin.startsWith("http://localhost:") ||
+      normalizedOrigin.startsWith("http://127.0.0.1:") ||
+      normalizedOrigin.startsWith("http://[::1]:") ||
+      normalizedOrigin === "http://localhost" ||
+      normalizedOrigin === "http://127.0.0.1")
   ) {
+    return true
+  }
+
+  // Check against site's registered domain if provided
+  if (siteDomain && normalizeOrigin(siteDomain) === normalizedOrigin) {
     return true
   }
 
@@ -33,16 +54,29 @@ export function isOriginAllowed(
     // No restrictions configured — allow all origins (useful for development
     // and for sites that haven't set up origin allow-listing yet).
     if (allowed.length === 0) return true
-    return allowed.some((o) => {
-      if (o === "*" || o === origin) return true
+
+    return allowed.some((raw) => {
+      const o = raw.trim()
+      if (o === "*") return true
+      const normalizedEntry = normalizeOrigin(o)
+      if (normalizedEntry === normalizedOrigin) return true
+
+      // Handle wildcard patterns (e.g. https://*.github.io, *.domain.com)
       if (o.includes("*")) {
+        const patternStr = o.match(/^https?:\/\//i)
+          ? o
+          : `https?://${o.replace(/^\*\./, "([^.]+\\.)*")}`
         const pattern = new RegExp(
           "^" +
-            o.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*") +
-            "$"
+            patternStr
+              .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+              .replace(/\\\*/g, ".*") +
+            "/?.*$",
+          "i"
         )
-        return pattern.test(origin)
+        return pattern.test(origin) || pattern.test(normalizedOrigin)
       }
+
       return false
     })
   } catch {

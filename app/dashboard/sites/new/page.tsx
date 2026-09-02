@@ -24,12 +24,17 @@ export default function NewSitePage() {
 
     const form = new FormData(e.currentTarget)
     const domain = (form.get("domain") as string) ?? ""
-    const origin = domain
-      ? (domain.match(/^https?:\/\//) ? domain : `https://${domain}`).replace(
-          /\/+$/,
-          ""
-        )
-      : ""
+    let origin = ""
+    if (domain) {
+      try {
+        const withProto = domain.match(/^https?:\/\//i)
+          ? domain
+          : `https://${domain}`
+        origin = new URL(withProto).origin
+      } catch {
+        origin = domain.replace(/\/+$/, "")
+      }
+    }
     const body = {
       name: form.get("name") as string,
       domain,
